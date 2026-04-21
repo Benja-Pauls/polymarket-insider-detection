@@ -20,7 +20,16 @@ data/raw/**/*.parquet
 data/raw/**/*.pkl
 data/processed/**/*.parquet
 data/processed/**/*.pkl
-# But keep directory structure
+# Scraper + extractor disk caches — regeneratable
+data/labels/_*_cache/
+data/labels/**/_extract_cache/
+data/labels/**/raw.parquet
+data/labels/**/enriched.parquet
+# But keep curated seeds, labels, and review CSVs
+!data/labels/news_seeds.json
+!data/labels/confirmed_labels.parquet
+!data/labels/**/review_*.csv
+# Keep directory structure
 !data/raw/**/.gitkeep
 !data/processed/**/.gitkeep
 

@@ -1,39 +1,39 @@
 PYTHON := source ~/Documents/Personal/Stock_Portfolio/.venv/bin/activate && python
 SCRIPTS := scripts
 
-.PHONY: help data features labels models figures paper clean check
+.PHONY: help data catalog trades scrape extract label match paper clean
 
 help:
-	@echo "Targets:"
-	@echo "  data       Collect raw subgraph + RPC data into data/raw/"
-	@echo "  features   Build feature matrix → data/processed/features.parquet"
-	@echo "  labels     Assemble labeled dataset → data/processed/labels.parquet"
-	@echo "  models     Train + evaluate all models → models/, results/"
-	@echo "  figures    Regenerate paper figures → figures/"
+	@echo "Targets (current trade-level pipeline):"
+	@echo "  catalog    Build the resolved-market catalog from Goldsky"
+	@echo "  trades     Fetch per-market trade files (14d pre-resolution)"
+	@echo "  scrape     Scrape Reddit/Twitter/news for insider-trade callouts"
+	@echo "  extract    LLM-extract structured fields from raw callouts"
+	@echo "  match      Link callouts to on-chain trade episodes"
+	@echo "  label      Produce confirmed labels parquet"
 	@echo "  paper      Compile paper.pdf"
-	@echo "  check      Verify data pipeline integrity"
 	@echo "  clean      Remove generated artifacts (keeps raw cache)"
 
-data:
-	$(PYTHON) -m pminsider.collect --all
+catalog:
+	$(PYTHON) -m pminsider.collect --phase catalog
 
-features: data
-	$(PYTHON) $(SCRIPTS)/build_features.py
+trades: catalog
+	$(PYTHON) -m pminsider.collect --phase trades
 
-labels: data
-	$(PYTHON) $(SCRIPTS)/build_labels.py
+scrape:
+	$(PYTHON) $(SCRIPTS)/scrape_all.py
 
-models: features labels
-	$(PYTHON) $(SCRIPTS)/train_models.py
+extract: scrape
+	$(PYTHON) $(SCRIPTS)/extract_callouts.py
 
-figures: models
-	$(PYTHON) $(SCRIPTS)/make_figures.py
+match: extract trades
+	$(PYTHON) $(SCRIPTS)/match_callouts.py
 
-paper: figures
+label: match
+	$(PYTHON) $(SCRIPTS)/build_trade_labels.py
+
+paper:
 	cd paper && latexmk -pdf paper.tex
-
-check:
-	$(PYTHON) $(SCRIPTS)/check_pipeline.py
 
 clean:
 	rm -rf data/processed/*.parquet data/processed/*.pkl
