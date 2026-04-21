@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# Virtualenv — we reuse Stock_Portfolio/.venv
+.venv/
+venv/
+env/
+
+# Data artifacts (too large / privacy)
+data/raw/**/*.json
+data/raw/**/*.parquet
+data/raw/**/*.pkl
+data/processed/**/*.parquet
+data/processed/**/*.pkl
+# But keep directory structure
+!data/raw/**/.gitkeep
+!data/processed/**/.gitkeep
+
+# Model checkpoints
+models/*.pkl
+models/*.joblib
+models/*.pt
+
+# Notebooks — keep .ipynb but strip outputs via pre-commit (TODO)
+.ipynb_checkpoints/
+
+# Logs
+*.log
+logs/
+
+# Secrets (none expected in-repo — we read from Stock_Portfolio/.env)
+.env
+.env.local
+*.pem
+*.key
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# LaTeX
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
+paper/*.bbl
+paper/*.blg
+paper/*.lof
+paper/*.lot
+paper/*.nav
+paper/*.snm
+paper/*.vrb
