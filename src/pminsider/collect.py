@@ -442,18 +442,66 @@ def main() -> None:
         log.info("phase B: fetching trades for %d markets (window=%d days)…", len(df), args.window_days)
         trades_dir = args.out_dir / "trades"
         trades_dir.mkdir(parents=True, exist_ok=True)
+        ok = failed = skipped = 0
         for row in tqdm(df.to_dict("records"), desc="per-market trades"):
-            rec = MarketRecord(**row)
+            rec = _record_from_row(row)
             out = trades_dir / f"{rec.condition_id}.parquet"
             if out.exists():
+                skipped += 1
                 continue
             try:
                 trades = fetch_trades(g, rec, window_days=args.window_days)
             except Exception as e:  # noqa: BLE001
                 log.warning("  fetch failed for %s: %s", rec.condition_id, e)
+                failed += 1
                 continue
             if not trades.empty:
                 trades.to_parquet(out, index=False)
+                ok += 1
+            else:
+                # Still write an empty marker so we don't re-try
+                out.touch()
+                ok += 1
+        log.info("phase B complete: ok=%d skipped=%d failed=%d", ok, skipped, failed)
+
+
+def _record_from_row(row: dict) -> MarketRecord:
+    """Normalize a pandas-produced row dict into a MarketRecord."""
+    def _coerce_list(v):
+        if v is None:
+            return []
+        if isinstance(v, list):
+            return list(v)
+        # numpy arrays / pandas Series
+        return list(v)
+
+    rt = row.get("resolution_timestamp")
+    return MarketRecord(
+        condition_id=str(row["condition_id"]),
+        question_id=(
+            str(row["question_id"]) if row.get("question_id") not in (None, "")
+            else None
+        ),
+        resolution_timestamp=int(rt) if rt is not None and not pd.isna(rt) else None,
+        payouts=(
+            list(row["payouts"]) if row.get("payouts") is not None
+            and not isinstance(row["payouts"], float) else None
+        ),
+        outcome_slot_count=(
+            int(row["outcome_slot_count"])
+            if row.get("outcome_slot_count") is not None
+            and not pd.isna(row["outcome_slot_count"])
+            else None
+        ),
+        oracle=(
+            str(row["oracle"]) if row.get("oracle") not in (None, "")
+            else None
+        ),
+        token_ids=_coerce_list(row.get("token_ids")),
+        total_volume_usd=float(row.get("total_volume_usd") or 0),
+        total_trades=int(row.get("total_trades") or 0),
+        source_tier=str(row.get("source_tier") or "unknown"),
+    )
 
 
 if __name__ == "__main__":

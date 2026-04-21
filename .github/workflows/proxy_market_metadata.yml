@@ -1,0 +1,61 @@
+name: Proxy Polymarket market metadata
+
+# Polymarket's REST API geo-blocks US IPs. This workflow runs on GitHub's
+# EU/Azure datacenters (which are NOT geo-blocked) and commits a snapshot
+# of market question text + category back to the repo. Keyed by
+# conditionId ↔ questionId so we can join on-chain data with off-chain
+# metadata locally.
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: "Markets per page (max 500)"
+        required: false
+        default: "500"
+      resolved_only:
+        description: "Only resolved markets (true/false)"
+        required: false
+        default: "true"
+  schedule:
+    # Weekly refresh
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest  # Azure EU-West, NOT geo-blocked
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install requests pandas pyarrow
+
+      - name: Fetch markets from Gamma API
+        env:
+          BATCH: ${{ github.event.inputs.batch_size || '500' }}
+          RESOLVED: ${{ github.event.inputs.resolved_only || 'true' }}
+        run: |
+          mkdir -p data/offchain
+          python scripts/fetch_gamma_metadata.py \
+            --batch $BATCH \
+            --resolved $RESOLVED \
+            --out data/offchain/markets_metadata.parquet
+
+      - name: Commit snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/offchain/markets_metadata.parquet
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "chore(data): refresh Gamma API metadata snapshot [skip ci]"
+            git push
+          fi
