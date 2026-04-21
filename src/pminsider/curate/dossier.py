@@ -152,6 +152,25 @@ def build_dossier(candidate: dict, ctx: DossierContext) -> str:
     # -------- MARKET METADATA --------
     md = ctx._market_metadata_by_cid.get(cid) if cid else None
     if md:
+        # outcomes/outcomePrices are numpy arrays; stringify cleanly + interpret
+        outcomes_raw = md.get("outcomes")
+        prices_raw = md.get("outcomePrices")
+        outcomes_list = list(outcomes_raw) if outcomes_raw is not None else []
+        prices_list = [str(p) for p in prices_raw] if prices_raw is not None else []
+        if outcomes_list and prices_list and len(outcomes_list) == len(prices_list):
+            pairs = ", ".join(f'{o}={p}' for o, p in zip(outcomes_list, prices_list))
+            # Identify the winner explicitly so Opus doesn't mis-read
+            winner = None
+            try:
+                floats = [float(p) for p in prices_list]
+                if any(f > 0 for f in floats):
+                    winner = outcomes_list[floats.index(max(floats))]
+            except (TypeError, ValueError):
+                pass
+            resolution_line = f"**Resolution:** {pairs}" + (f"  → winner = **{winner}**" if winner else "")
+        else:
+            resolution_line = None
+
         lines.append("\n## Market metadata")
         lines.append(f"- **Question (Polymarket, verbatim):** {md.get('question','?')}")
         lines.append(f"- **Category:** {md.get('category','?')}")
@@ -159,8 +178,11 @@ def build_dossier(candidate: dict, ctx: DossierContext) -> str:
         lines.append(f"- **Volume (Gamma):** ${_safe_float(md.get('volume')):,.0f}")
         lines.append(f"- **Start:** {md.get('startDate','?')}")
         lines.append(f"- **End:** {md.get('endDate','?')}")
-        lines.append(f"- **Outcomes:** {md.get('outcomes','?')}")
-        lines.append(f"- **Final prices:** {md.get('outcomePrices','?')}")
+        lines.append(f"- **Outcomes:** {outcomes_list or '?'}")
+        if resolution_line:
+            lines.append(f"- {resolution_line}")
+        else:
+            lines.append(f"- **Final prices:** {prices_list or '?'}")
 
     # Also grab from our catalog for resolution timestamp and payouts
     if cid and not ctx.catalog.empty:
