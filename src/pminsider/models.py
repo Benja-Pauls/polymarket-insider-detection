@@ -60,7 +60,7 @@ NEGATIVE_LABELS = {"negative", "strong_negative"}
 # ----------------------------------------------------------------------
 
 def select_feature_columns(feats: pd.DataFrame) -> list[str]:
-    """Columns to feed into the model — everything numeric except IDs and labels."""
+    """Columns to feed into the model — everything numeric except IDs, labels, and leakage."""
     drop = {
         "condition_id",
         "source_tier",
@@ -69,10 +69,13 @@ def select_feature_columns(feats: pd.DataFrame) -> list[str]:
         "label_confidence",
         "split",
     }
-    # meta_winning_outcome_index leaks the outcome — drop it
+    # meta_winning_outcome_index / dir_resolution_outcome_index leak the outcome
     drop.add("meta_winning_outcome_index")
     drop.add("dir_resolution_outcome_index")
     drop |= {c for c in feats.columns if c.startswith("_pred_")}
+    # winner_*_hit and winner_*_net_usd are defined relative to the winning
+    # outcome — strict leakage for a predictor; exclude from model features.
+    drop |= {c for c in feats.columns if c.startswith("winner_")}
     numeric = feats.select_dtypes(include=[np.number]).columns.tolist()
     return [c for c in numeric if c not in drop]
 

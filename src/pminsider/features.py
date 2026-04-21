@@ -46,6 +46,7 @@ def compute_features(
     total_trades: int | None = None,
     outcome_slot_count: int | None = None,
     market_creation_ts: int | None = None,
+    token_to_outcome: dict | None = None,
 ) -> dict:
     """Produce a flat dict of features for one market.
 
@@ -56,6 +57,11 @@ def compute_features(
     ``payouts`` is the raw on-chain payout vector from ``Condition.payouts``
     (e.g. ``['1','0']`` means outcome index 0 won). Used to determine the
     "winning direction" for ``dir_flow_agrees_with_resolution``.
+
+    ``token_to_outcome``: optional map {token_id: outcome_index}. When provided
+    we normalize the trade directions so that ``dir_*_toward_winner`` features
+    correctly reflect net USDC flow into the winning outcome (disambiguating
+    Yes-buys from No-sells).
     """
     feats: dict = {
         "meta_total_volume_usd": float(total_volume_usd or 0),
@@ -81,6 +87,23 @@ def compute_features(
         outcome_slot_count == 2 if outcome_slot_count else None
     )
 
+    # Add per-trade signed USDC flow toward outcome-0 (if we have the mapping)
+    if token_to_outcome:
+        df = df.assign(
+            signed_usd=df.apply(
+                lambda r: _signed_flow_toward_outcome0(r, token_to_outcome),
+                axis=1,
+            )
+        )
+    else:
+        # Fallback: positive for BUY, negative for SELL (ignores token/outcome)
+        df = df.assign(
+            signed_usd=df.apply(
+                lambda r: r["usd_spent_usdc"] if r["side"] == "BUY" else -r["usd_spent_usdc"],
+                axis=1,
+            )
+        )
+
     # Establish the time window bounds
     t_max = resolution_timestamp
     earliest_in_df = int(df["timestamp"].min())
@@ -91,10 +114,50 @@ def compute_features(
     # Direction features
     feats.update(_direction_features(df, t_max, winning_outcome_index=winning_outcome_index))
     # Price features
-    feats.update(_price_features(df, t_max))
+    feats.update(_price_features(df, t_max, token_to_outcome=token_to_outcome))
     # Wallet features
     feats.update(_wallet_features(df, t_max))
+    # Outcome-normalized winner-direction features (requires token_to_outcome)
+    if token_to_outcome and winning_outcome_index is not None:
+        feats.update(_winner_aligned_features(df, t_max, winning_outcome_index=winning_outcome_index))
 
+    return feats
+
+
+def _signed_flow_toward_outcome0(row: pd.Series, token_to_outcome: dict) -> float:
+    """USDC flow is positive if it pushes probability of outcome 0 UP.
+
+    BUY of outcome-0 token    → +usd (bullish outcome 0)
+    SELL of outcome-0 token   → -usd
+    BUY of outcome-1 token    → -usd (bullish outcome 1 = bearish outcome 0)
+    SELL of outcome-1 token   → +usd
+    Unknown outcome → 0 (drop from directional signal).
+    """
+    tok = row.get("token_id")
+    oi = token_to_outcome.get(tok) if tok else None
+    if oi is None:
+        return 0.0
+    usd = float(row.get("usd_spent_usdc") or 0)
+    if oi == 0:
+        return usd if row["side"] == "BUY" else -usd
+    if oi == 1:
+        return -usd if row["side"] == "BUY" else usd
+    return 0.0
+
+
+def _winner_aligned_features(df: pd.DataFrame, t_max: int, *, winning_outcome_index: int) -> dict:
+    """Features expressing the net flow in the direction of the actual winner.
+
+    Positive value = flow pointed toward the winner (informed-trading-consistent).
+    """
+    feats: dict = {}
+    winner_sign = +1 if winning_outcome_index == 0 else -1
+    df = df.assign(toward_winner=df["signed_usd"] * winner_sign)
+    for h in HORIZONS_HOURS:
+        mask = df["timestamp"] >= (t_max - h * 3600)
+        win = df.loc[mask]
+        feats[f"winner_{h}h_net_usd"] = float(win["toward_winner"].sum())
+        feats[f"winner_{h}h_hit"] = int(win["toward_winner"].sum() > 0)
     return feats
 
 
@@ -194,9 +257,27 @@ def _direction_features(df: pd.DataFrame, t_max: int, *, winning_outcome_index: 
     return feats
 
 
-def _price_features(df: pd.DataFrame, t_max: int) -> dict:
+def _price_features(df: pd.DataFrame, t_max: int, *, token_to_outcome: dict | None = None) -> dict:
     feats: dict = {}
-    prices = df["price"].astype(float)
+    # Normalize price to "implied probability of outcome 0" when we know
+    # which outcome each trade's token represents. Without mapping we fall
+    # back to the raw price (mixed Yes/No series, more noisy).
+    if token_to_outcome:
+        df = df.assign(
+            norm_price=df.apply(
+                lambda r: (
+                    float(r["price"])
+                    if token_to_outcome.get(r["token_id"]) == 0
+                    else 1.0 - float(r["price"])
+                    if token_to_outcome.get(r["token_id"]) == 1
+                    else float(r["price"])
+                ),
+                axis=1,
+            )
+        )
+        prices = df["norm_price"].astype(float)
+    else:
+        prices = df["price"].astype(float)
 
     # Last trade price (nearest resolution)
     last_price = float(prices.iloc[-1]) if len(prices) else math.nan

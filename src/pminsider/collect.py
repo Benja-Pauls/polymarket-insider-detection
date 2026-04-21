@@ -59,6 +59,10 @@ class MarketRecord:
     outcome_slot_count: int | None
     oracle: str | None
     token_ids: list[str]
+    # Map token_id → outcome_index (0 for "Yes", 1 for "No" in a binary market).
+    # Populated from MarketData.outcomeIndex. May have None values for tokens
+    # whose outcome we couldn't resolve.
+    token_to_outcome: dict | None
     total_volume_usd: float
     total_trades: int
     source_tier: str  # "historical" or "live"
@@ -102,8 +106,13 @@ def lookup_conditions_for_tokens(
     *,
     batch_size: int = 100,
 ) -> dict[str, dict]:
-    """Return ``{token_id: {condition_id, outcome_index}}`` via ``marketDatas`` batch."""
+    """Return ``{token_id: {condition_id, outcome_index}}`` via ``marketDatas`` batch.
+
+    Falls back to the orderbook_resync subgraph if outcomeIndex is null in the
+    live one (which is common — live subgraph often has outcomeIndex=None).
+    """
     out: dict[str, dict] = {}
+    missing_outcome: list[str] = []
     for i in range(0, len(token_ids), batch_size):
         chunk = token_ids[i : i + batch_size]
         ids_gql = "[" + ", ".join(f'"{t}"' for t in chunk) + "]"
@@ -114,12 +123,31 @@ def lookup_conditions_for_tokens(
         """
         res = g.query("orderbook", q)
         for m in res.data.get("marketDatas", []) or []:
+            oi = m.get("outcomeIndex")
+            if oi is None:
+                missing_outcome.append(m["id"])
             out[m["id"]] = {
                 "condition_id": m.get("condition"),
-                "outcome_index": (
-                    int(m["outcomeIndex"]) if m.get("outcomeIndex") is not None else None
-                ),
+                "outcome_index": int(oi) if oi is not None else None,
             }
+
+    # Fall back to resync for tokens missing outcomeIndex
+    for i in range(0, len(missing_outcome), batch_size):
+        chunk = missing_outcome[i : i + batch_size]
+        ids_gql = "[" + ", ".join(f'"{t}"' for t in chunk) + "]"
+        q = f"""
+        {{ marketDatas(first: {len(chunk)}, where: {{id_in: {ids_gql}}}) {{
+            id outcomeIndex
+          }} }}
+        """
+        try:
+            res = g.query("orderbook_resync", q)
+        except Exception:  # noqa: BLE001
+            continue
+        for m in res.data.get("marketDatas", []) or []:
+            oi = m.get("outcomeIndex")
+            if oi is not None and m["id"] in out:
+                out[m["id"]]["outcome_index"] = int(oi)
     return out
 
 
@@ -269,6 +297,12 @@ def build_market_catalog(
         meta = hist_res.get(cid) or live_res.get(cid)
         if not meta:
             continue  # unresolved
+        # Build token → outcome_index map from the tokens we collected
+        t2o: dict[str, int | None] = {}
+        for tok in agg["tokens"]:
+            mapping = token_to_cond.get(tok) or {}
+            t2o[tok] = mapping.get("outcome_index")
+
         rec = MarketRecord(
             condition_id=cid,
             question_id=meta.get("question_id"),
@@ -277,6 +311,7 @@ def build_market_catalog(
             outcome_slot_count=meta.get("outcome_slot_count"),
             oracle=meta.get("oracle"),
             token_ids=sorted(agg["tokens"]),
+            token_to_outcome=t2o,
             total_volume_usd=agg["vol"],
             total_trades=agg["trades"],
             source_tier=meta.get("source_tier", "unknown"),
@@ -472,8 +507,18 @@ def _record_from_row(row: dict) -> MarketRecord:
             return []
         if isinstance(v, list):
             return list(v)
-        # numpy arrays / pandas Series
         return list(v)
+
+    def _coerce_dict(v):
+        if v is None:
+            return {}
+        if isinstance(v, dict):
+            return dict(v)
+        # pandas sometimes stores dicts as numpy object arrays
+        try:
+            return dict(v)
+        except (TypeError, ValueError):
+            return {}
 
     rt = row.get("resolution_timestamp")
     return MarketRecord(
@@ -498,6 +543,7 @@ def _record_from_row(row: dict) -> MarketRecord:
             else None
         ),
         token_ids=_coerce_list(row.get("token_ids")),
+        token_to_outcome=_coerce_dict(row.get("token_to_outcome")),
         total_volume_usd=float(row.get("total_volume_usd") or 0),
         total_trades=int(row.get("total_trades") or 0),
         source_tier=str(row.get("source_tier") or "unknown"),

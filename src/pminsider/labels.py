@@ -57,11 +57,17 @@ class WeakLabelThresholds:
         per-trade price volatility. Separates "real info" from noise.
       - ``dir_alignment_thresh``: the net-flow direction agrees with the
         winning outcome by at least this margin (signed imbalance).
+      - ``require_winner_alignment``: when True, only flag as weak_positive
+        if the net flow pointed TOWARD the actual winner
+        (``winner_24h_net_usd > 0``). Not a "clean" label — it implicitly
+        uses the outcome as a predictor — but useful for pedagogical paper
+        exposition and for contrasting against the random baseline.
     """
     vol_spike_ratio_min: float = 3.0
     top1_share_min: float = 0.15
     abs_z_move_min: float = 2.0
     dir_alignment_thresh: float = 0.4  # |signed_imbalance| >= this
+    require_winner_alignment: bool = False
 
 
 def classify_from_features(
@@ -105,6 +111,9 @@ def classify_from_features(
         & df["_pred_directional"]
         & df["_pred_has_window_activity"]
     )
+    if th.require_winner_alignment and "winner_24h_net_usd" in df.columns:
+        weak_pos_mask &= df["winner_24h_net_usd"].fillna(0) > 0
+        df["_pred_winner_aligned"] = df["winner_24h_net_usd"].fillna(0) > 0
 
     # Negative: neither spike nor z-move fired AND there was decent activity
     neg_mask = (

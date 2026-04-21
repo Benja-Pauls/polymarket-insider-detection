@@ -47,6 +47,13 @@ def main() -> None:
                 missing += 1
                 trades = pd.DataFrame()
 
+        token_map = None
+        if "token_to_outcome" in m and m["token_to_outcome"] is not None:
+            # Handle pandas-level dict/numpy types
+            try:
+                token_map = dict(m["token_to_outcome"])
+            except (TypeError, ValueError):
+                token_map = None
         feats = compute_features(
             trades,
             resolution_timestamp=int(m["resolution_timestamp"]),
@@ -54,6 +61,7 @@ def main() -> None:
             total_volume_usd=float(m["total_volume_usd"]),
             total_trades=int(m["total_trades"]),
             outcome_slot_count=int(m["outcome_slot_count"]) if m["outcome_slot_count"] else 2,
+            token_to_outcome=token_map,
         )
         feats["condition_id"] = cid
         feats["source_tier"] = m["source_tier"]
