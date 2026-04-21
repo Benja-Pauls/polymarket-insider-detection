@@ -1,9 +1,10 @@
 """Merge all label-candidate sources into a single ranked table.
 
 Inputs:
-    data/labels/incidents/incidents.parquet     (canonical callout incidents)
-    data/labels/onchain_candidates.parquet      (on-chain miner output)
-    data/labels/whale_trackers/*.parquet        (optional, when scraped)
+    data/labels/incidents/incidents_matched.parquet  (callouts + fuzzy-matched condition_id)
+    data/labels/onchain_candidates.parquet           (on-chain miner output)
+    data/labels/market_tradability.parquet           (Haiku insider-tradeability classifier)
+    data/labels/whale_trackers/*.parquet             (optional, when scraped)
 
 Output:
     data/labels/unified_candidates.parquet
@@ -17,6 +18,15 @@ Each unified row is a (wallet?, market?, time_window) tuple with:
   - evidence_urls  list of source URLs
   - known_handle   optional Polymarket handle (Burdensome-Mix, etc.)
   - known_wallet   optional 0x address
+
+Pipeline:
+  1. Load callouts (prefer incidents_matched.parquet for matched_condition_id)
+  2. Load on-chain miner candidates, filter by --onchain-min-flags
+  3. Drop on-chain candidates whose market was classified as non-insider-tradeable
+     (sports, crypto-price, elections). Keep unknown/ambiguous for triage.
+  4. Enrich via markets_metadata (question, slug, category, volume, endDate)
+  5. Collapse (wallet, condition_id) duplicates — a callout row merged with
+     its on-chain row keeps callout evidence URLs but gains trade-level context.
 """
 from __future__ import annotations
 
@@ -92,6 +102,9 @@ def _incidents_to_candidates(incidents_path: Path) -> pd.DataFrame:
             "onchain_size_percentile": None,
             "onchain_win_aligned": None,
             "onchain_flags_count": None,
+            "onchain_realized_profit_usd": None,
+            "onchain_profit_ratio": None,
+            "onchain_entry_vwap_on_winner": None,
         })
     return pd.DataFrame(rows)
 
@@ -101,25 +114,26 @@ def _tier_to_score(tier: str) -> float:
 
 
 def _onchain_to_candidates(onchain_path: Path, min_flags: int = 4) -> pd.DataFrame:
+    """Load on-chain miner output. Flags include realized_profit + informed_entry."""
     if not onchain_path.exists():
         return pd.DataFrame()
     df = pd.read_parquet(onchain_path)
     df = df[df["flags_count"] >= min_flags].copy()
     rows = []
     for _, r in df.iterrows():
-        flags_str = ";".join([
-            f
-            for f, name in [
-                (r["flag_fresh_wallet"], "fresh_wallet"),
-                (r["flag_single_market"], "single_market"),
-                (r["flag_large_first_position"], "large_first_position"),
-                (r["flag_win_aligned_top"], "win_aligned_top"),
-                (r["flag_directional"], "directional"),
-                (r["flag_early_timing"], "early_timing"),
-            ]
-            if f
-            for f in [name]  # trick to use `name` as the value when True
-        ])
+        flag_pairs = [
+            (r.get("flag_fresh_wallet"), "fresh_wallet"),
+            (r.get("flag_single_market"), "single_market"),
+            (r.get("flag_large_first_position"), "large_first_position"),
+            (r.get("flag_realized_profit"), "realized_profit"),
+            (r.get("flag_informed_entry"), "informed_entry"),
+            (r.get("flag_early_timing"), "early_timing"),
+        ]
+        flags_str = ";".join(name for v, name in flag_pairs if bool(v))
+        # Win-aligned: proxy from informed_entry OR realized_profit (both imply
+        # the wallet held the eventual winner). Preserves the column name the
+        # downstream curator and finalizer read.
+        win_aligned = bool(r.get("flag_informed_entry")) or bool(r.get("flag_realized_profit"))
         rows.append({
             "candidate_id": _stable_id("onchain", r["wallet"], r["condition_id"]),
             "source": "onchain",
@@ -139,11 +153,21 @@ def _onchain_to_candidates(onchain_path: Path, min_flags: int = 4) -> pd.DataFra
             "flags": flags_str,
             "evidence_urls": "",
             "incident_id": None,
+            "matched_question": None,
             "onchain_usd_in_market": float(r["wallet_usd_in_market"]),
             "onchain_wallet_concentration": float(r["wallet_concentration_in_this_market"]),
             "onchain_size_percentile": float(r["wallet_size_percentile_in_market"]),
-            "onchain_win_aligned": bool(r["wallet_win_aligned"]),
+            "onchain_win_aligned": win_aligned,
             "onchain_flags_count": int(r["flags_count"]),
+            "onchain_realized_profit_usd": (
+                float(r["realized_profit_usd"]) if pd.notna(r.get("realized_profit_usd")) else None
+            ),
+            "onchain_profit_ratio": (
+                float(r["profit_ratio"]) if pd.notna(r.get("profit_ratio")) else None
+            ),
+            "onchain_entry_vwap_on_winner": (
+                float(r["entry_vwap_on_winner"]) if pd.notna(r.get("entry_vwap_on_winner")) else None
+            ),
         })
     return pd.DataFrame(rows)
 
@@ -163,6 +187,162 @@ def _whale_trackers_to_candidates(trackers_dir: Path) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
+def _apply_tradability_filter(
+    df: pd.DataFrame,
+    tradability_path: Path,
+    *,
+    log=log,
+) -> pd.DataFrame:
+    """Drop on-chain candidates whose market is not insider-tradeable.
+
+    Keeps:
+      - all callout rows (they already cleared a news-based filter)
+      - on-chain rows whose market is in {tradeable_*, unknown, ambiguous}
+      - on-chain rows whose condition_id is not in the tradability catalog
+        at all (no classification → cannot reject)
+
+    Drops:
+      - on-chain rows where is_insider_tradeable=False AND category starts
+        with ``not_tradeable_`` (sports, crypto-price, elections, weather, social).
+    """
+    if not tradability_path.exists():
+        log.warning("tradability catalog missing: %s — skipping filter", tradability_path)
+        return df
+    td = pd.read_parquet(tradability_path)
+    log.info("loaded tradability catalog: %d markets", len(td))
+    # Build the set of condition_ids to DROP
+    drop_mask = (td["is_insider_tradeable"] == False) & (  # noqa: E712
+        td["category_tradability"].fillna("").str.startswith("not_tradeable_")
+    )
+    drop_cids = set(td.loc[drop_mask, "condition_id"].tolist())
+    log.info("tradability catalog: %d markets flagged not_tradeable_*", len(drop_cids))
+
+    before = len(df)
+    # Only filter on-chain (callouts we keep regardless)
+    is_callout = df["source"].eq("callout") if "source" in df.columns else False
+    in_drop = df["condition_id"].isin(drop_cids)
+    keep = ~in_drop | is_callout
+    out = df[keep].copy()
+    dropped = before - len(out)
+    log.info("tradability filter: %d → %d rows  (dropped %d non-tradeable)",
+             before, len(out), dropped)
+    return out
+
+
+_TIER_ORDER = {"T1": 0, "T2": 1, "T3": 2}
+
+
+def _merge_pre_curation_duplicates(df: pd.DataFrame, *, log=log) -> pd.DataFrame:
+    """Collapse rows that share (wallet, condition_id) BEFORE the LLM pass.
+
+    When a callout row and an on-chain row point at the same wallet+market:
+      - Keep callout evidence_urls and incident_id
+      - Gain on-chain trade-level context (flags_count, concentration, profit)
+      - Mark source as "callout;onchain"
+      - Take max suspicion_score, best (T1 > T2 > T3) confidence_tier
+      - Sum n_supporting_sources
+      - Use callout candidate_id (more stable for cache reuse on callout side)
+    """
+    if df.empty or "wallet" not in df.columns or "condition_id" not in df.columns:
+        return df
+
+    has_pair = df["wallet"].notna() & df["condition_id"].notna()
+    pair_df = df[has_pair].copy()
+    standalone = df[~has_pair].copy()
+    if pair_df.empty:
+        return df
+
+    # Normalize wallet case so the same wallet (e.g. EIP-55 mixed case vs lowercased
+    # from Goldsky) collapses into a single group. We only use the lowercase form
+    # for grouping — we preserve the original wallet field in the output row.
+    pair_df["_wallet_key"] = pair_df["wallet"].astype(str).str.lower()
+
+    merged_rows = []
+    merges_applied = 0
+    for (wallet_key, cid), g in pair_df.groupby(["_wallet_key", "condition_id"], dropna=False):
+        if len(g) == 1:
+            merged_rows.append(g.iloc[0].to_dict())
+            continue
+        merges_applied += 1
+        # Sort so callout rows come first — they win on identity-bearing fields
+        callout_rows = g[g["source"] == "callout"]
+        onchain_rows = g[g["source"] == "onchain"]
+        base = callout_rows.iloc[0].to_dict() if not callout_rows.empty else g.iloc[0].to_dict()
+        row = dict(base)
+
+        # Combine sources
+        srcs = sorted({s for s in g["source"].dropna().tolist() if s})
+        row["source"] = ";".join(srcs)
+        row["sub_source"] = ";".join(sorted({
+            s for s in g["sub_source"].dropna().tolist() if s
+        }))
+
+        # Best suspicion score + tier
+        row["suspicion_score"] = float(g["suspicion_score"].max())
+        tiers = [t for t in g["confidence_tier"].dropna().tolist() if t]
+        if tiers:
+            row["confidence_tier"] = min(tiers, key=lambda t: _TIER_ORDER.get(t, 999))
+
+        # Sum supporting sources
+        row["n_supporting_sources"] = int(g["n_supporting_sources"].fillna(0).sum())
+
+        # Callout-side evidence wins
+        if not callout_rows.empty:
+            ev = callout_rows["evidence_urls"].iloc[0]
+            if isinstance(ev, str) and ev:
+                row["evidence_urls"] = ev
+            iid = callout_rows["incident_id"].iloc[0]
+            if pd.notna(iid):
+                row["incident_id"] = iid
+            mq = callout_rows["market_question"].iloc[0]
+            if isinstance(mq, str) and mq:
+                row["market_question"] = mq
+            # Preserve callout time-window
+            for c in ("ts_lower", "ts_upper", "direction", "outcome_resolved"):
+                v = callout_rows[c].iloc[0] if c in callout_rows.columns else None
+                if pd.notna(v):
+                    row[c] = v
+
+        # On-chain trade-level fields win when callout was NULL
+        if not onchain_rows.empty:
+            oc = onchain_rows.iloc[0]
+            for col in (
+                "onchain_usd_in_market", "onchain_wallet_concentration",
+                "onchain_size_percentile", "onchain_win_aligned",
+                "onchain_flags_count", "onchain_realized_profit_usd",
+                "onchain_profit_ratio", "onchain_entry_vwap_on_winner",
+            ):
+                if col in onchain_rows.columns:
+                    v = oc.get(col)
+                    if pd.notna(v):
+                        row[col] = v
+            # Inherit the richer flag string if callout was empty
+            if (not row.get("flags")) or row.get("flags") == "":
+                row["flags"] = oc.get("flags", row.get("flags"))
+            else:
+                # Concatenate: "tier=T1;n_sources=5 | fresh_wallet;realized_profit;..."
+                row["flags"] = f"{row.get('flags','')} | {oc.get('flags','')}"
+            # Use the largest observed size
+            sz_max = g["size_usd_approx"].dropna().max() if "size_usd_approx" in g.columns else None
+            if pd.notna(sz_max):
+                row["size_usd_approx"] = float(sz_max)
+
+        # Record the merge
+        row["merged_candidate_ids"] = json.dumps(g["candidate_id"].tolist())
+        # Normalize wallet to lowercase so downstream trade lookups / merges match
+        row["wallet"] = wallet_key
+        # Drop the grouping helper before writing
+        row.pop("_wallet_key", None)
+        merged_rows.append(row)
+
+    log.info("pre-curation merges applied: %d", merges_applied)
+    merged_df = pd.DataFrame(merged_rows)
+    if "_wallet_key" in merged_df.columns:
+        merged_df = merged_df.drop(columns=["_wallet_key"])
+    out = pd.concat([merged_df, standalone], ignore_index=True)
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--incidents", type=Path, default=Path("data/labels/incidents/incidents.parquet"))
@@ -170,9 +350,13 @@ def main() -> None:
     ap.add_argument("--trackers-dir", type=Path, default=Path("data/labels/whale_trackers"))
     ap.add_argument("--metadata", type=Path, default=Path("data/offchain/markets_metadata.parquet"),
                     help="GH-Actions-proxied Polymarket Gamma API snapshot")
+    ap.add_argument("--tradability", type=Path,
+                    default=Path("data/labels/market_tradability.parquet"),
+                    help="Haiku insider-tradeability classifier output")
     ap.add_argument("--out", type=Path, default=Path("data/labels/unified_candidates.parquet"))
     ap.add_argument("--review-out", type=Path, default=Path("data/labels/unified_candidates_review.csv"))
-    ap.add_argument("--onchain-min-flags", type=int, default=5)
+    ap.add_argument("--onchain-min-flags", type=int, default=4,
+                    help="Minimum number of on-chain flags required for a candidate")
     ap.add_argument("--top-review", type=int, default=500)
     ap.add_argument("--log-level", default="INFO")
     args = ap.parse_args()
@@ -199,8 +383,14 @@ def main() -> None:
         return
 
     df = pd.concat(frames, ignore_index=True)
+    log.info("concat: %d rows  (by source: %s)",
+             len(df), df["source"].value_counts().to_dict())
 
-    # Enrich on-chain rows with market_question via metadata
+    # ---- TRADABILITY FILTER -----
+    # Drop on-chain rows whose market is not insider-tradeable (sports, crypto-price, elections)
+    df = _apply_tradability_filter(df, args.tradability, log=log)
+
+    # Enrich with markets_metadata (question, slug, category, volume, endDate)
     if args.metadata.exists():
         md = pd.read_parquet(args.metadata)
         md_slim = md[["conditionId", "question", "slug", "category", "volume", "endDate"]].rename(
@@ -213,6 +403,10 @@ def main() -> None:
         df["market_question"] = df["market_question"].fillna(df.get("md_question"))
         log.info("joined metadata — markets with question text: %d / %d",
                  df["market_question"].notna().sum(), len(df))
+
+    # ---- PRE-CURATION MERGE -----
+    # Collapse (wallet, condition_id) pairs that appear in both callout + on-chain
+    df = _merge_pre_curation_duplicates(df, log=log)
 
     df = df.sort_values("suspicion_score", ascending=False).reset_index(drop=True)
 
@@ -230,7 +424,8 @@ def main() -> None:
         "wallet", "condition_id", "market_question",
         "size_usd_approx", "direction", "outcome_resolved",
         "onchain_flags_count", "onchain_wallet_concentration", "onchain_size_percentile",
-        "onchain_win_aligned", "flags", "ts_lower", "ts_upper",
+        "onchain_win_aligned", "onchain_realized_profit_usd", "onchain_profit_ratio",
+        "flags", "ts_lower", "ts_upper", "merged_candidate_ids",
         "evidence_urls",
     ]
     review_cols = [c for c in review_cols if c in df.columns]
