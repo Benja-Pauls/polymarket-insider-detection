@@ -20,12 +20,19 @@ from .schema import EnrichedCallout, ExtractedCallout, RawCallout, now_iso
 
 log = logging.getLogger(__name__)
 
-MODEL_ID = "claude-haiku-4-5-20251001"
+MODEL_ID = "claude-sonnet-4-6"
 
-# Approximate Haiku 4.5 pricing (2026). Update if it changes.
-_INPUT_COST_PER_MTOK = 0.80
-_CACHED_INPUT_COST_PER_MTOK = 0.08
-_OUTPUT_COST_PER_MTOK = 4.00
+# Approximate pricing per million tokens. Update if Anthropic changes them.
+# Sonnet 4.6 is our default for labeling quality. Haiku 4.5 available for
+# bulk first-pass classification.
+_PRICING = {
+    "claude-haiku-4-5-20251001": (0.80, 0.08, 4.00),
+    "claude-sonnet-4-6":         (3.00, 0.30, 15.00),
+    "claude-sonnet-4-6-20250929": (3.00, 0.30, 15.00),
+    "claude-opus-4-7":            (15.00, 1.50, 75.00),
+}
+# Fallback for unknown models — use sonnet pricing
+_DEFAULT_PRICING = (3.00, 0.30, 15.00)
 
 SYSTEM_PROMPT = """You extract structured insider-trading allegations from prediction-market community posts.
 
@@ -127,11 +134,12 @@ class LLMExtractor:
 
         # Pricing
         usage = resp.usage
+        in_price, cached_price, out_price = _PRICING.get(self.model, _DEFAULT_PRICING)
         input_cost = (
-            (usage.input_tokens or 0) * _INPUT_COST_PER_MTOK
-            + (getattr(usage, "cache_read_input_tokens", 0) or 0) * _CACHED_INPUT_COST_PER_MTOK
+            (usage.input_tokens or 0) * in_price
+            + (getattr(usage, "cache_read_input_tokens", 0) or 0) * cached_price
         ) / 1_000_000
-        output_cost = (usage.output_tokens or 0) * _OUTPUT_COST_PER_MTOK / 1_000_000
+        output_cost = (usage.output_tokens or 0) * out_price / 1_000_000
         cost = input_cost + output_cost
         self.total_cost_usd += cost
         self.total_calls += 1

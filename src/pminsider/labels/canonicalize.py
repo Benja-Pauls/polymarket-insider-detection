@@ -74,16 +74,23 @@ def _norm_question(q: str | None) -> str:
 # Key named entities that anchor the match. If both rows share any of these,
 # they're likely the same incident (subject to time-window overlap).
 ANCHOR_TOKENS = [
-    "maduro", "venezuela", "caracas",
-    "iran", "strike", "strikes",
-    "gpt", "openai",
-    "google", "search ranking",
-    "maga", "trump", "election",
-    "ceasefire", "ukraine", "russia",
+    "maduro", "venezuela", "caracas", "operation absolute resolve",
+    "iran", "iranian", "tehran",
+    "strike on iran", "strikes on iran", "iran strike",
+    "ceasefire", "cease-fire", "cease fire",
+    "gpt", "openai", "gpt-5", "chatgpt",
+    "gemini", "google", "year in search", "alpharaccoon",
+    "maga", "trump", "election 2024", "presidential election", "french whale", "theo", "fredi",
+    "ukraine", "russia",
     "axiom",
-    "tv series", "aliens", "survivor", "bachelorette",
-    "yemen", "houthi",
-    "fed", "fomc",
+    "survivor", "bachelorette", "aliens show",
+    "yemen", "houthi", "houthis",
+    "fed", "fomc", "federal reserve",
+    "nobel", "peace prize", "machado", "maria corina",
+    "burdensome-mix", "burdensome", "magamyman", "dirtycup", "alpharaccoon",
+    "supreme court", "scotus",
+    "hungary", "orban", "magyar", "tisza",
+    "barron", "barron trump",
 ]
 
 
@@ -108,33 +115,90 @@ def _windows_overlap(a_lo, a_hi, b_lo, b_hi, *, slack_hours: int = 72) -> bool:
         return True
 
 
+_HANDLE_RE = re.compile(r'"([A-Za-z][A-Za-z0-9_-]{3,40})"')
+
+
+def _extract_handles(text) -> set[str]:
+    """Extract quoted Polymarket handles from text (e.g., \"Burdensome-Mix\")."""
+    text = _str_or_empty(text)
+    if not text:
+        return set()
+    matches = _HANDLE_RE.findall(text)
+    # Filter out things that are obviously not handles
+    blacklist = {"Yes", "No", "YES", "NO", "yes", "no"}
+    return {m for m in matches if m not in blacklist and len(m) >= 4}
+
+
+def _str_or_empty(v) -> str:
+    """Safe string-coercion that treats NaN/None/float-nan as empty."""
+    if v is None:
+        return ""
+    if isinstance(v, float):
+        # NaN and inf are not strings
+        import math
+        if math.isnan(v) or math.isinf(v):
+            return ""
+    if not isinstance(v, str):
+        return ""
+    return v
+
+
 def _same_incident(a: dict, b: dict) -> bool:
-    # If explicit wallet matches, always merge
-    wa = (a.get("wallet_addr") or "").lower()
-    wb = (b.get("wallet_addr") or "").lower()
+    """Return True if two extractions are likely the same underlying incident.
+
+    Conservative: we only merge when there is a HIGH-CONFIDENCE signal —
+    matching wallet, matching trader handle, or (matching anchors AND very
+    close time windows AND size agreement). The design goal: prefer to
+    over-split rather than over-merge. Over-splitting is easy to fix with
+    a manual merge step; over-merging silently collapses distinct events.
+    """
+    # 1. Explicit wallet-address match — strongest possible signal
+    wa = _str_or_empty(a.get("wallet_addr")).lower()
+    wb = _str_or_empty(b.get("wallet_addr")).lower()
     if wa and wb and wa == wb:
         return True
 
-    # Anchor-word intersection on market_question + quote
-    atext = f"{a.get('market_question','')} {a.get('quote','')}"
-    btext = f"{b.get('market_question','')} {b.get('quote','')}"
+    # 2. Polymarket-handle match (quoted string like "Burdensome-Mix")
+    # STRONGER if both sources quote a distinctive handle the other also quotes.
+    a_handles = _extract_handles(a.get("quote")) | _extract_handles(a.get("reasoning"))
+    b_handles = _extract_handles(b.get("quote")) | _extract_handles(b.get("reasoning"))
+    shared_handles = a_handles & b_handles
+    if shared_handles:
+        # Filter out very generic ones like short common English words
+        distinctive = {h for h in shared_handles if len(h) >= 5 and not h.isalpha() or h.count("-") > 0}
+        if distinctive or any(len(h) >= 8 for h in shared_handles):
+            return True
+
+    # 3. Manual seed case_id match — when both rows come from the same
+    # manual_case_id, they're definitionally the same incident.
+    if a.get("manual_case_id") and a.get("manual_case_id") == b.get("manual_case_id"):
+        return True
+
+    # 4. Otherwise: require STRONG anchor match (≥2 anchors) AND tight time
+    # overlap (within 48h, not the default 72h) AND plausible size agreement.
+    atext = f"{_str_or_empty(a.get('market_question'))} {_str_or_empty(a.get('quote'))}"
+    btext = f"{_str_or_empty(b.get('market_question'))} {_str_or_empty(b.get('quote'))}"
     a_anchors = _anchor_set(atext)
     b_anchors = _anchor_set(btext)
-    if not (a_anchors & b_anchors):
+    common = a_anchors & b_anchors
+    if len(common) < 2:
         return False
 
-    # Plus overlapping time windows (with slack)
+    # Multi-anchor overlap + tight window
     if not _windows_overlap(
         a.get("ts_lower"), a.get("ts_upper"),
         b.get("ts_lower"), b.get("ts_upper"),
+        slack_hours=48,
     ):
         return False
 
-    # And reasonable size agreement (within 10x or both null)
+    # Size plausibility
     sa = a.get("size_usd_approx")
     sb = b.get("size_usd_approx")
-    if sa and sb and (max(sa, sb) / max(1, min(sa, sb))) > 10:
-        return False
+    if sa and sb:
+        ratio = max(sa, sb) / max(1, min(sa, sb))
+        if ratio > 20:   # very different — likely unrelated
+            return False
 
     return True
 
@@ -181,9 +245,11 @@ def canonicalize(allegations_df: pd.DataFrame) -> list[Incident]:
         sizes = [float(r.get("size_usd_approx")) for r in g if r.get("size_usd_approx") is not None]
         size_mean = sum(sizes) / len(sizes) if sizes else None
 
-        # Window: intersection (max lower, min upper)
-        lowers = [r.get("ts_lower") for r in g if r.get("ts_lower")]
-        uppers = [r.get("ts_upper") for r in g if r.get("ts_upper")]
+        # Window: intersection (max lower, min upper) — filter NaN/None
+        lowers = [_str_or_empty(r.get("ts_lower")) for r in g]
+        uppers = [_str_or_empty(r.get("ts_upper")) for r in g]
+        lowers = [x for x in lowers if x]
+        uppers = [x for x in uppers if x]
         ts_lower = max(lowers) if lowers else None
         ts_upper = min(uppers) if uppers else None
 
