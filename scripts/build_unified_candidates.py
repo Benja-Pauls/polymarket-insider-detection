@@ -38,9 +38,14 @@ def _stable_id(*parts) -> str:
 
 
 def _incidents_to_candidates(incidents_path: Path) -> pd.DataFrame:
-    if not incidents_path.exists():
+    """Load either incidents.parquet OR the preferred incidents_matched.parquet."""
+    # Prefer the matched version (has matched_condition_id populated)
+    matched_path = incidents_path.parent / "incidents_matched.parquet"
+    path = matched_path if matched_path.exists() else incidents_path
+    if not path.exists():
         return pd.DataFrame()
-    df = pd.read_parquet(incidents_path)
+    df = pd.read_parquet(path)
+    has_match_col = "matched_condition_id" in df.columns
     rows = []
     for _, r in df.iterrows():
         wallets = []
@@ -55,6 +60,11 @@ def _incidents_to_candidates(incidents_path: Path) -> pd.DataFrame:
             citations = []
         urls = [c.get("source_url", "") for c in citations if c.get("source_url")]
 
+        # Use matched condition_id when available
+        cid = r.get("matched_condition_id") if has_match_col else None
+        if isinstance(cid, float):
+            cid = None  # NaN
+
         rows.append({
             "candidate_id": _stable_id(
                 "incident", r["incident_id"], ",".join(wallets), r.get("market_question", ""),
@@ -63,7 +73,7 @@ def _incidents_to_candidates(incidents_path: Path) -> pd.DataFrame:
             "sub_source": ";".join({c.get("source", "") for c in citations if c.get("source")}),
             "wallet": wallets[0] if wallets else None,
             "all_wallets": ";".join(wallets),
-            "condition_id": None,      # filled later by the matching layer
+            "condition_id": cid,
             "market_question": r.get("market_question", ""),
             "ts_lower": r.get("ts_lower"),
             "ts_upper": r.get("ts_upper"),
@@ -76,6 +86,7 @@ def _incidents_to_candidates(incidents_path: Path) -> pd.DataFrame:
             "flags": f"tier={r.get('confidence_tier')};n_sources={r.get('n_sources')}",
             "evidence_urls": ";".join(urls[:5]),
             "incident_id": r.get("incident_id"),
+            "matched_question": r.get("matched_question") if has_match_col else None,
             "onchain_usd_in_market": None,
             "onchain_wallet_concentration": None,
             "onchain_size_percentile": None,
