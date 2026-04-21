@@ -42,10 +42,11 @@ def main() -> None:
             "wallet_usd_in_market", "wallet_total_usd_across_all_markets",
             "wallet_market_count", "wallet_concentration_in_this_market",
             "wallet_size_percentile_in_market",
-            "wallet_flow_direction", "wallet_directional_pct",
-            "winner_outcome_index", "wallet_net_toward_winner_usd", "wallet_win_aligned",
+            "wallet_flow_direction",
+            "winner_outcome_index", "realized_profit_usd", "profit_ratio",
+            "entry_vwap_on_winner",
             "flag_fresh_wallet", "flag_single_market", "flag_large_first_position",
-            "flag_win_aligned_top", "flag_directional", "flag_early_timing",
+            "flag_realized_profit", "flag_informed_entry", "flag_early_timing",
             "resolution_timestamp", "market_total_volume_usd",
         ]
         review = df.head(args.top_review)[review_cols]
