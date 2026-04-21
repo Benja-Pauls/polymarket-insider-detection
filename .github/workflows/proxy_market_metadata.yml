@@ -57,5 +57,13 @@ jobs:
             echo "No changes"
           else
             git commit -m "chore(data): refresh Gamma API metadata snapshot [skip ci]"
-            git push
+            # Rebase onto any work that landed while the fetch step ran.
+            for i in 1 2 3 4 5; do
+              if git pull --rebase origin main && git push origin HEAD:main; then
+                echo "pushed on attempt $i"; exit 0
+              fi
+              echo "push attempt $i failed, retrying"
+              sleep 5
+            done
+            echo "push failed after 5 attempts"; exit 1
           fi

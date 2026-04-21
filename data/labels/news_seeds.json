@@ -1,86 +1,60 @@
 [
-  {
-    "url": "https://www.npr.org/2026/01/05/nx-s1-5667232/polymarket-maduro-bet-insider-trading",
-    "title": "A $400,000 profit on Maduro's capture raises insider trading questions on Polymarket",
-    "published_ts": 1736035200,
-    "tags": ["maduro", "venezuela", "polymarket"]
-  },
-  {
-    "url": "https://fortune.com/2026/01/05/polymarket-user-400k-maduro-capture-bets-insider-trading-suspicion/",
-    "title": "One Polymarket user made more than $400,000 in profits betting on Maduro's capture",
-    "published_ts": 1736035200,
-    "tags": ["maduro", "venezuela", "polymarket", "wallet"]
-  },
-  {
-    "url": "https://fortune.com/2026/01/12/polymarket-kalshi-insider-trading-prediction-markets-cftc-torres-titus-venezuela/",
-    "title": "Anonymous Polymarket trader made $400,000 betting on Maduro's downfall",
-    "published_ts": 1736640000,
-    "tags": ["maduro", "polymarket", "cftc"]
-  },
-  {
-    "url": "https://www.cnn.com/2026/03/30/politics/prediction-markets-justice-department",
-    "title": "Federal prosecutors exploring whether prediction market bets trip insider trading laws",
-    "published_ts": 1743292800,
-    "tags": ["doj", "investigation", "maduro", "iran", "tv-shows"]
-  },
-  {
-    "url": "https://www.aljazeera.com/news/2026/3/25/large-polymarket-wall-street-bets-on-trumps-war-news-under-scrutiny",
-    "title": "Large Polymarket, Wall Street bets on Trump's war news under scrutiny",
-    "published_ts": 1742860800,
-    "tags": ["iran", "polymarket", "trump", "war"]
-  },
-  {
-    "url": "https://qz.com/polymarket-iran-strike-insider-bet-prediction-markets",
-    "title": "Polymarket and the rise of a new kind of insider trading",
-    "published_ts": 1742860800,
-    "tags": ["iran", "polymarket"]
-  },
-  {
-    "url": "https://time.com/article/2026/04/10/white-house-oil-prediction-markets-polymarket-bets-insider-trading-war/",
-    "title": "White House Reportedly Warns Staff Against Insider Trading on Prediction Markets",
-    "published_ts": 1744243200,
-    "tags": ["polymarket", "white-house", "oil", "war"]
-  },
-  {
-    "url": "https://www.bitget.com/amp/news/detail/12560605226286",
-    "title": "Whale Wallets Raise Insider Trading Doubts on Polymarket After Axiom Probe",
-    "published_ts": 1742860800,
-    "tags": ["polymarket", "axiom", "whale-wallets"]
-  },
-  {
-    "url": "https://newrepublic.com/post/204885/insider-trading-trump-attack-venezuela-maduro-polymarket",
-    "title": "Was Someone Insider Trading Right Before Trump's Attack on Venezuela?",
-    "published_ts": 1736035200,
-    "tags": ["maduro", "venezuela", "polymarket"]
-  },
-  {
-    "url": "https://markets.financialcontent.com/stocks/article/predictstreet-2026-2-5-the-maduro-whale-inside-the-400000-trade-that-sparked-a-washington-firestorm",
-    "title": "The Maduro Whale: Inside the $400,000 Trade",
-    "published_ts": 1738713600,
-    "tags": ["maduro", "polymarket", "whale"]
-  },
-  {
-    "url": "https://markets.financialcontent.com/stocks/article/predictstreet-2026-1-17-the-400000-maduro-snatch-and-extract-payout-prediction-markets-face-an-existential-insider-trading-crisis",
-    "title": "The $400,000 Maduro Snatch-and-Extract Payout",
-    "published_ts": 1737072000,
-    "tags": ["maduro", "polymarket"]
-  },
-  {
-    "url": "https://markets.financialcontent.com/stocks/article/predictstreet-2026-1-14-the-400000-shadow-bet-how-a-timely-wager-on-maduros-downfall-ignited-an-insider-trading-firestorm",
-    "title": "The $400,000 Shadow Bet on Maduro's Downfall",
-    "published_ts": 1736812800,
-    "tags": ["maduro", "polymarket"]
-  },
-  {
-    "url": "https://igamingbusiness.com/legal-compliance/maduro-trade-triggers-bill-on-insider-trading-safeguards/",
-    "title": "Polymarket Maduro trade triggers federal bill on insider trading safeguards",
-    "published_ts": 1737072000,
-    "tags": ["maduro", "polymarket", "regulation"]
-  },
-  {
-    "url": "https://en.wikipedia.org/wiki/Polymarket",
-    "title": "Polymarket — Wikipedia",
-    "published_ts": null,
-    "tags": ["polymarket", "reference"]
-  }
+  {"url": "https://www.npr.org/2026/01/05/nx-s1-5667232/polymarket-maduro-bet-insider-trading", "title": "NPR: $400K Maduro Polymarket bet", "published_ts": 1736035200, "tags": ["maduro", "venezuela", "polymarket"]},
+  {"url": "https://fortune.com/2026/01/05/polymarket-user-400k-maduro-capture-bets-insider-trading-suspicion/", "title": "Fortune: Polymarket user made $400K+ on Maduro capture", "published_ts": 1736035200, "tags": ["maduro", "venezuela", "polymarket", "wallet"]},
+  {"url": "https://fortune.com/2026/01/12/polymarket-kalshi-insider-trading-prediction-markets-cftc-torres-titus-venezuela/", "title": "Fortune: Anonymous Polymarket trader made $400K on Maduro", "published_ts": 1736640000, "tags": ["maduro", "polymarket", "cftc"]},
+  {"url": "https://www.cnn.com/2026/03/30/politics/prediction-markets-justice-department", "title": "CNN: Federal prosecutors exploring insider-trade laws on prediction markets", "published_ts": 1743292800, "tags": ["doj", "investigation", "maduro", "iran", "tv-shows"]},
+  {"url": "https://www.aljazeera.com/news/2026/3/25/large-polymarket-wall-street-bets-on-trumps-war-news-under-scrutiny", "title": "Al Jazeera: Polymarket + Wall Street bets on Trump war news", "published_ts": 1742860800, "tags": ["iran", "polymarket", "trump", "war"]},
+  {"url": "https://qz.com/polymarket-iran-strike-insider-bet-prediction-markets", "title": "Quartz: Polymarket Iran strike insider bet", "published_ts": 1742860800, "tags": ["iran", "polymarket"]},
+  {"url": "https://time.com/article/2026/04/10/white-house-oil-prediction-markets-polymarket-bets-insider-trading-war/", "title": "TIME: White House warns staff about prediction-market insider trading", "published_ts": 1744243200, "tags": ["polymarket", "white-house", "oil", "war"]},
+  {"url": "https://www.bitget.com/amp/news/detail/12560605226286", "title": "Bitget: Whale wallets raise insider trading doubts after Axiom probe", "published_ts": 1742860800, "tags": ["polymarket", "axiom", "whale-wallets"]},
+  {"url": "https://newrepublic.com/post/204885/insider-trading-trump-attack-venezuela-maduro-polymarket", "title": "New Republic: Was someone insider trading before Trump's Venezuela attack?", "published_ts": 1736035200, "tags": ["maduro", "venezuela", "polymarket"]},
+  {"url": "https://markets.financialcontent.com/stocks/article/predictstreet-2026-2-5-the-maduro-whale-inside-the-400000-trade-that-sparked-a-washington-firestorm", "title": "PredictStreet: The Maduro Whale, inside the $400K trade", "published_ts": 1738713600, "tags": ["maduro", "polymarket", "whale"]},
+  {"url": "https://markets.financialcontent.com/stocks/article/predictstreet-2026-1-17-the-400000-maduro-snatch-and-extract-payout-prediction-markets-face-an-existential-insider-trading-crisis", "title": "PredictStreet: $400K Maduro snatch-and-extract payout", "published_ts": 1737072000, "tags": ["maduro", "polymarket"]},
+  {"url": "https://markets.financialcontent.com/stocks/article/predictstreet-2026-1-14-the-400000-shadow-bet-how-a-timely-wager-on-maduros-downfall-ignited-an-insider-trading-firestorm", "title": "PredictStreet: $400K shadow bet on Maduro", "published_ts": 1736812800, "tags": ["maduro", "polymarket"]},
+  {"url": "https://igamingbusiness.com/legal-compliance/maduro-trade-triggers-bill-on-insider-trading-safeguards/", "title": "iGB: Maduro trade triggers bill on insider trading safeguards", "published_ts": 1737072000, "tags": ["maduro", "polymarket", "regulation"]},
+  {"url": "https://finance.yahoo.com/news/polymarket-trader-makes-1-million-090001027.html", "title": "Yahoo: Polymarket trader $1M on Google Search bets, insider fears", "published_ts": 1733414400, "tags": ["google", "polymarket", "alpharaccoon", "year-in-search"]},
+  {"url": "https://www.inc.com/ava-levinson/polymarket-million-dollar-google-win-raises-questions/91274626", "title": "Inc: Polymarket $1M Google win raises insider questions", "published_ts": 1733414400, "tags": ["google", "polymarket", "alpharaccoon"]},
+  {"url": "https://gizmodo.com/polymarket-user-accused-of-1-million-insider-trade-on-google-search-markets-2000696258", "title": "Gizmodo: Polymarket user accused of $1M Google Search insider trade", "published_ts": 1733414400, "tags": ["google", "polymarket", "alpharaccoon"]},
+  {"url": "https://beincrypto.com/alleged-google-insider-trade-polymarket/", "title": "BeInCrypto: How an alleged Google insider made $1M on Polymarket", "published_ts": 1733414400, "tags": ["google", "polymarket", "alpharaccoon", "wallet"]},
+  {"url": "https://www.igamingtoday.com/a-perfect-betting-streak-raises-red-flags-on-polymarkets-google-search-markets/", "title": "iGaming: Perfect betting streak on Polymarket Google markets", "published_ts": 1733414400, "tags": ["google", "polymarket", "alpharaccoon"]},
+  {"url": "https://defirate.com/news/polymarket-trader-turned-10k-into-1m-google/", "title": "DeFi Rate: Polymarket trader turned $10K into $1M on Google", "published_ts": 1733414400, "tags": ["google", "polymarket", "alpharaccoon"]},
+  {"url": "https://hoodline.com/2025/12/meta-engineer-claims-google-insider-used-early-search-data-in-1m-polymarket-plunder/", "title": "Hoodline: Meta engineer claims Google insider used early search data", "published_ts": 1733414400, "tags": ["google", "polymarket", "alpharaccoon"]},
+  {"url": "https://gizmodo.com/the-great-insider-trading-reckoning-reportedly-hits-openai-2000727838", "title": "Gizmodo: Insider trading reckoning hits OpenAI", "published_ts": 1744243200, "tags": ["openai", "gpt", "polymarket"]},
+  {"url": "https://www.thefp.com/p/french-whale-makes-85-million-on-polymarket-trump-win", "title": "Free Press: French whale $85M on Trump win", "published_ts": 1731024000, "tags": ["trump", "election2024", "french-whale", "theo"]},
+  {"url": "https://www.cbsnews.com/news/french-whale-made-over-80-million-on-polymarket-betting-on-trump-election-win-60-minutes/", "title": "CBS 60 Minutes: French whale $80M on Trump", "published_ts": 1731024000, "tags": ["trump", "election2024", "french-whale"]},
+  {"url": "https://finance.yahoo.com/news/polymarket-whale-actually-made-85-050139914.html", "title": "Yahoo: Polymarket whale made $85M", "published_ts": 1731024000, "tags": ["trump", "election2024", "french-whale"]},
+  {"url": "https://sherwood.news/markets/french-polymarket-theo-record-breaking-million-bet-pay-out/", "title": "Sherwood: French Polymarket whale Théo", "published_ts": 1731024000, "tags": ["trump", "election2024", "french-whale", "theo"]},
+  {"url": "https://markets.financialcontent.com/stocks/article/predictstreet-2026-1-17-the-tho-effect-how-an-85-million-bet-ignited-the-2026-prediction-market-super-cycle", "title": "PredictStreet: Théo Effect $85M bet", "published_ts": 1737072000, "tags": ["theo", "polymarket"]},
+  {"url": "https://www.chaincatcher.com/en/article/2233047", "title": "ChainCatcher: Polymarket 2025 Six Major Profit Models — 95M on-chain transactions", "published_ts": null, "tags": ["polymarket", "whales", "research"]},
+  {"url": "https://medium.com/@josh.insidertrading.tech/polymarket-how-crypto-prediction-markets-legalized-insider-trading-1665fe9e8598", "title": "Medium: How crypto prediction markets legalized insider trading", "published_ts": null, "tags": ["polymarket", "research"]},
+  {"url": "https://en.wikipedia.org/wiki/Polymarket", "title": "Polymarket — Wikipedia", "published_ts": null, "tags": ["polymarket", "reference"]},
+  {"url": "https://www.wionews.com/world/military-intel-for-gambling-israeli-air-force-major-charged-with-using-secret-iran-war-details-to-win-big-on-polymarket-1774598651598", "title": "WION: Israeli Air Force major charged, classified Iran war intel for Polymarket bets", "published_ts": 1740700800, "tags": ["iran", "yemen", "israel", "polymarket", "iaf-major"]},
+  {"url": "https://www.timesofisrael.com/israeli-air-force-major-charged-with-using-classified-info-to-place-bets-on-polymarket/", "title": "Times of Israel: Air Force major charged with using classified info for Polymarket bets", "published_ts": 1740700800, "tags": ["iran", "israel", "polymarket"]},
+  {"url": "https://www.timesofisrael.com/two-indicted-for-using-classified-info-to-place-online-bets-on-military-operations/", "title": "Times of Israel: Two indicted for using classified info for military bets", "published_ts": 1740700800, "tags": ["iran", "israel", "polymarket"]},
+  {"url": "https://www.timesofisrael.com/polymarket-bets-on-us-iran-ceasefire-appear-to-suggest-insider-trading/", "title": "Times of Israel: Polymarket bets on US-Iran ceasefire suggest insider trading", "published_ts": 1744243200, "tags": ["iran", "ceasefire", "polymarket"]},
+  {"url": "https://www.cnn.com/2026/03/24/politics/iran-war-bets-prediction-markets", "title": "CNN: Trader made ~$1M on Polymarket with accurate Iran bets", "published_ts": 1742774400, "tags": ["iran", "polymarket", "cnn"]},
+  {"url": "https://www.cnbc.com/2026/04/15/kalshi-and-polymarket-congress-regulation-washington-influence.html", "title": "CNBC: Kalshi/Polymarket lobby as insider trading eyed by Congress", "published_ts": 1744675200, "tags": ["congress", "regulation", "kalshi", "polymarket"]},
+  {"url": "https://www.tipranks.com/news/kalshi-and-polymarket-face-congress-scrutiny-over-insider-trading-concerns", "title": "TipRanks: Congress scrutiny over insider trading", "published_ts": 1744675200, "tags": ["congress", "polymarket"]},
+  {"url": "https://www.cbsnews.com/news/polymarket-insider-trading-rules-iran-war-venezuela/", "title": "CBS: Polymarket buckles down on insider trading", "published_ts": 1744675200, "tags": ["polymarket", "regulation"]},
+  {"url": "https://gamingamerica.com/news/reality-tv-betting-insider-trading-prediction-markets", "title": "Gaming America: Reality TV bets raise insider concerns", "published_ts": 1743292800, "tags": ["kalshi", "tv", "survivor", "bachelorette"]},
+  {"url": "https://staytuned.substack.com/p/polymarkets-insider-trading-problem", "title": "Barb McQuade: Polymarket's insider trading problem", "published_ts": 1743292800, "tags": ["polymarket", "analysis"]},
+  {"url": "https://www.newsweek.com/vindman-demands-polymarket-records-over-traitorous-military-bets-11850930", "title": "Newsweek: Vindman demands Polymarket records over military bets", "published_ts": 1743292800, "tags": ["polymarket", "vindman", "regulation"]},
+  {"url": "https://www.financemagnates.com/cryptocurrency/unusual-whales-extends-insider-radar-to-prediction-markets-with-unusual-predictions/", "title": "FinanceMagnates: Unusual Whales extends insider radar to prediction markets", "published_ts": 1743292800, "tags": ["unusualwhales", "tool"]},
+  {"url": "https://phemex.com/news/article/unusual-whales-launches-tool-to-track-insider-trading-on-polymarket-54994", "title": "Phemex: Unusual Whales tool tracks Polymarket insider", "published_ts": 1743292800, "tags": ["unusualwhales", "tool"]},
+  {"url": "https://www.weex.com/news/detail/dissecting-polymarkets-top-10-whales-27000-transactions-the-smart-money-mirage-and-the-law-of-survival-296753", "title": "WEEX: Dissecting Polymarket's top 10 whales, 27K transactions", "published_ts": null, "tags": ["research", "whales", "top10"]},
+  {"url": "https://www.chaincatcher.com/en/article/2233047", "title": "ChainCatcher: Polymarket 2025 Six Major Profit Models — 95M on-chain txns", "published_ts": null, "tags": ["research", "whales"]},
+  {"url": "https://www.newarab.com/analysis/gambling-death-polymarket-and-dark-rise-war-betting", "title": "NewArab: Gambling on death — Polymarket and war betting", "published_ts": 1743292800, "tags": ["iran", "israel", "polymarket"]},
+  {"url": "https://philippdubach.com/posts/the-absolute-insider-mess-of-prediction-markets/", "title": "Dubach: The absolute insider mess of prediction markets", "published_ts": 1744243200, "tags": ["polymarket", "kalshi", "analysis"]},
+  {"url": "https://www.mexc.com/news/783229", "title": "MEXC: The Many Cases of Insider Trading on Polymarket", "published_ts": null, "tags": ["polymarket", "survey"]},
+  {"url": "https://www.mexc.co/en-IN/news/233271", "title": "MEXC: Polymarket trader $1M on Google Search Bets", "published_ts": 1733414400, "tags": ["google", "alpharaccoon", "polymarket"]},
+  {"url": "https://bitcoinethereumnews.com/tech/how-an-alleged-google-insider-made-1-million-on-polymarket/", "title": "Bitcoin Ethereum News: Alleged Google insider $1M on Polymarket", "published_ts": 1733414400, "tags": ["google", "alpharaccoon", "polymarket"]},
+  {"url": "https://www.todayonchain.com/news/article/01KBPXNCHB7F55S2ERYB77XE9A/", "title": "TodayOnChain: Polymarket $1M on Google Search bets", "published_ts": 1733414400, "tags": ["google", "alpharaccoon"]},
+  {"url": "https://www.bitget.com/amp/news/detail/12560605098443", "title": "Bitget: Polymarket $1M Google Search bets", "published_ts": 1733414400, "tags": ["google", "alpharaccoon"]},
+  {"url": "https://finance.yahoo.com/news/norway-probes-potential-insider-trading-194041145.html", "title": "Yahoo: Norway probes Polymarket insider trading for Nobel Peace Prize", "published_ts": 1728691200, "tags": ["nobel", "peace-prize", "polymarket", "norway"]},
+  {"url": "https://www.cryptopolitan.com/nobel-investigates-itself-over-polymarket/", "title": "Cryptopolitan: Nobel Committee investigates itself after Polymarket predicted winner", "published_ts": 1728691200, "tags": ["nobel", "polymarket"]},
+  {"url": "https://blockworks.com/news/polymarket-nobel-probe", "title": "Blockworks: Polymarket bets trigger Nobel leak probe in Norway", "published_ts": 1728691200, "tags": ["nobel", "polymarket"]},
+  {"url": "https://decrypt.co/343840/nobel-peace-prize-organizers-intestigating-polymarket-insider-trades", "title": "Decrypt: Nobel Peace Prize Organizers probing Polymarket insider trades", "published_ts": 1728691200, "tags": ["nobel", "polymarket"]},
+  {"url": "https://www.coindesk.com/markets/2025/10/11/norwegian-officials-probe-major-polymarket-bets-on-nobel-peace-winner", "title": "CoinDesk: Norwegian officials probe Polymarket bets on Nobel Peace winner", "published_ts": 1728691200, "tags": ["nobel", "polymarket"]},
+  {"url": "https://bravenewcoin.com/insights/potential-nobel-peace-prize-betting-scandal-norway-investigates-suspicious-polymarket-activity", "title": "BraveNewCoin: Nobel Peace Prize betting scandal", "published_ts": 1728691200, "tags": ["nobel", "polymarket"]},
+  {"url": "https://finance.yahoo.com/news/nobel-peace-prize-organizers-probing-172429753.html", "title": "Yahoo: Nobel Peace Prize organizers probing Polymarket trades", "published_ts": 1728691200, "tags": ["nobel", "polymarket"]}
 ]
