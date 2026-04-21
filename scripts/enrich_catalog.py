@@ -21,39 +21,36 @@ from pminsider.goldsky import GoldskyClient
 
 
 def fetch_tokens_for_condition(g: GoldskyClient, condition_id: str) -> dict[str, int | None]:
-    """Return {token_id: outcome_index} for all outcome tokens of this condition."""
-    out: dict[str, int | None] = {}
-    # Live subgraph first
-    q = f"""
-    {{ marketDatas(first: 10, where: {{condition: "{condition_id}"}}) {{
-        id condition outcomeIndex
-      }} }}
-    """
-    try:
-        res = g.query("orderbook", q).data.get("marketDatas", []) or []
-    except Exception:  # noqa: BLE001
-        res = []
-    for m in res:
-        oi = m.get("outcomeIndex")
-        out[m["id"]] = int(oi) if oi is not None else None
+    """Return {token_id: outcome_index} for all outcome tokens of this condition.
 
-    # Resync fallback for outcome index if null
-    missing = [t for t, oi in out.items() if oi is None]
-    if missing:
-        try:
-            ids = "[" + ",".join(f'"{t}"' for t in missing) + "]"
-            q2 = f"""
-            {{ marketDatas(first: {len(missing)}, where: {{id_in: {ids}}}) {{
-                id outcomeIndex
-              }} }}
-            """
-            res2 = g.query("orderbook_resync", q2).data.get("marketDatas", []) or []
-            for m in res2:
-                oi = m.get("outcomeIndex")
-                if oi is not None:
-                    out[m["id"]] = int(oi)
-        except Exception:  # noqa: BLE001
-            pass
+    Source of truth is ``pnl.Condition.positionIds`` which is an ordered list:
+    index 0 → outcome-0 token, index 1 → outcome-1 token, etc. This is how
+    Polymarket's conditional-tokens framework encodes the outcome slots.
+    ``orderbook.marketData.outcomeIndex`` is nullable on most CLOB markets
+    and cannot be used as the primary source.
+    """
+    out: dict[str, int | None] = {}
+    try:
+        res = g.query(
+            "pnl",
+            f'{{ c: condition(id: "{condition_id}") {{ positionIds }} }}',
+        ).data.get("c")
+    except Exception:  # noqa: BLE001
+        res = None
+    if res and res.get("positionIds"):
+        for i, pid in enumerate(res["positionIds"]):
+            out[str(pid)] = i
+        return out
+
+    # Fallback: also try the orderbook_resync subgraph
+    try:
+        res2 = g.query(
+            "orderbook_resync",
+            f'{{ c: condition(id: "{condition_id}") {{ outcomeSlotCount }} }}',
+        ).data.get("c")
+    except Exception:  # noqa: BLE001
+        res2 = None
+    # We don't get positionIds here; leave empty
     return out
 
 

@@ -115,10 +115,22 @@ def classify_from_features(
         weak_pos_mask &= df["winner_24h_net_usd"].fillna(0) > 0
         df["_pred_winner_aligned"] = df["winner_24h_net_usd"].fillna(0) > 0
 
-    # Negative: neither spike nor z-move fired AND there was decent activity
+    # Negative: no spike AND no extreme z-move AND low concentration AND decent activity.
+    # We broaden this to make the class-balance closer: "clearly not insider".
     neg_mask = (
         ~df["_pred_spike"]
         & ~df["_pred_z_move"]
+        & ~df["_pred_concentrated"]
+        & df["_pred_has_window_activity"]
+    )
+
+    # Soft-negative: markets that have activity and 0-1 predicates firing, but
+    # don't meet strict neg criteria. We label these "negative" as well for the
+    # model — the assumption is that most markets are NOT insider-driven.
+    # Without this the dataset is too imbalanced to train on.
+    soft_neg_mask = (
+        (df[["_pred_spike", "_pred_concentrated", "_pred_z_move", "_pred_directional"]]
+         .astype(int).sum(axis=1) <= 1)
         & df["_pred_has_window_activity"]
     )
 
@@ -126,9 +138,9 @@ def classify_from_features(
     exclude_mask = df["meta_window_trade_count"].fillna(0) < 20
 
     label = pd.Series("ambiguous", index=df.index)
-    label[weak_pos_mask] = "weak_positive"
-    label[neg_mask] = "negative"
-    # Exclusion overrides everything
+    label[soft_neg_mask] = "negative"      # assume most markets are non-insider
+    label[neg_mask] = "negative"            # the stricter criterion
+    label[weak_pos_mask] = "weak_positive"  # overrides neg if all 4 signals fire
     label[exclude_mask] = "excluded_low_activity"
 
     df["label"] = label
