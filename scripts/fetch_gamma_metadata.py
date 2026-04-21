@@ -21,6 +21,7 @@ GAMMA_BASE = "https://gamma-api.polymarket.com"
 def fetch_markets(batch_size: int, resolved_only: bool) -> list[dict]:
     out: list[dict] = []
     offset = 0
+    consecutive_errors = 0
     log = logging.getLogger("fetch_gamma")
     params_base = {
         "limit": batch_size,
@@ -31,17 +32,33 @@ def fetch_markets(batch_size: int, resolved_only: bool) -> list[dict]:
         params_base["closed"] = "true"
     while True:
         params = dict(params_base, offset=offset)
-        log.info("fetching offset=%d", offset)
-        r = requests.get(f"{GAMMA_BASE}/markets", params=params, timeout=30)
-        r.raise_for_status()
-        data = r.json()
+        if offset % 10000 == 0:
+            log.info("fetching offset=%d (have %d markets)", offset, len(out))
+        try:
+            r = requests.get(f"{GAMMA_BASE}/markets", params=params, timeout=30)
+            if r.status_code in (400, 422):
+                # Offset beyond the API's supported range — done.
+                log.info("offset %d returned HTTP %d — treating as end of stream", offset, r.status_code)
+                break
+            r.raise_for_status()
+            data = r.json()
+            consecutive_errors = 0
+        except requests.exceptions.RequestException as e:
+            consecutive_errors += 1
+            log.warning("error at offset %d: %s (consecutive=%d)", offset, e, consecutive_errors)
+            if consecutive_errors >= 5:
+                log.warning("stopping after 5 consecutive errors")
+                break
+            time.sleep(2 * consecutive_errors)
+            continue
         if not data:
             break
         out.extend(data)
         offset += batch_size
-        time.sleep(0.5)  # be polite
+        time.sleep(0.3)
         if len(data) < batch_size:
             break
+    log.info("fetched %d markets total", len(out))
     return out
 
 
